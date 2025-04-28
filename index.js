@@ -20,20 +20,20 @@ const users = {};
 io.on('connection', (socket) => {
     console.log('Nowe połączenie:', socket.id);
 
-    socket.emit('roomList', rooms); // Wysyłamy listę pokoi do nowego użytkownika
+    // Emit the correct room list structure
+    socket.emit('roomList', getRoomsWithCounts());
 
     socket.on('joinRoom', ({ nickname, room }) => {
         users[socket.id] = { nickname, room };
         socket.join(room);
-        io.emit('roomList', getRoomsWithCounts());
 
-
-
-        // Jeśli pokój nie istnieje, dodaj
+        // Add the room if it doesn't exist
         if (!rooms.includes(room)) {
             rooms.push(room);
-            io.emit('roomList', rooms); // aktualizuj listę pokoi
         }
+
+        // Emit the updated room list
+        io.emit('roomList', getRoomsWithCounts());
 
         console.log(`${nickname} dołączył do pokoju: ${room}`);
 
@@ -48,14 +48,13 @@ io.on('connection', (socket) => {
         socket.leave(oldRoom);
         socket.join(newRoom);
         users[socket.id].room = newRoom;
-        io.emit('roomList', getRoomsWithCounts());
 
-        // Dodaj nowy pokój jeśli nie istnieje
+        // Add the new room if it doesn't exist
         if (!rooms.includes(newRoom)) {
             rooms.push(newRoom);
-            io.emit('roomList', rooms); // wysyłamy nową listę pokoi
         }
 
+        // Send messages before deleting empty rooms
         socket.to(oldRoom).emit('message', {
             nickname: 'System',
             message: `${nickname} opuścił pokój.`,
@@ -69,33 +68,21 @@ io.on('connection', (socket) => {
         });
 
         console.log(`${nickname} zmienił pokój z ${oldRoom} na ${newRoom}`);
+
+        // Delete empty rooms after sending messages
+        deleteEmptyRooms();
+
+        // Emit the updated room list
+        io.emit('roomList', getRoomsWithCounts());
     });
 
-
-    // Obsługa wiadomości tekstowej
+    // Handle chatMessage event
     socket.on('chatMessage', ({ nickname, room, message }) => {
-        io.to(room).emit('message', {
-            nickname,
-            message,
-            time: moment().format('HH:mm')
-        });
+        const time = moment().format('HH:mm');
+        io.to(room).emit('message', { nickname, message, time });
+        console.log(`[${room}] ${nickname}: ${message}`);
     });
 
-    // Obsługa przesyłania zdjęcia
-    socket.on('chatImage', ({ nickname, room, image }) => {
-        io.to(room).emit('image', {
-            nickname,
-            image,
-            time: moment().format('HH:mm')
-        });
-    });
-
-    // Obsługa eventu "typing..."
-    socket.on('typing', ({ nickname, room }) => {
-        socket.to(room).emit('typing', { nickname });
-    });
-
-    // Obsługa rozłączenia użytkownika
     socket.on('disconnect', () => {
         if (users[socket.id]) {
             const { nickname, room } = users[socket.id];
@@ -107,6 +94,9 @@ io.on('connection', (socket) => {
             console.log(`${nickname} (${socket.id}) rozłączył się`);
             delete users[socket.id];
         }
+
+        // Delete empty rooms and emit the updated room list
+        deleteEmptyRooms();
         io.emit('roomList', getRoomsWithCounts());
     });
 });
@@ -128,6 +118,20 @@ function getRoomsWithCounts() {
         name: room,
         count: roomCounts[room] || 0
     }));
+}
+
+function deleteEmptyRooms() {
+    for (const room of rooms) {
+        if (room !== 'general') {
+            const roomCount = io.sockets.adapter.rooms.get(room)?.size || 0;
+            if (roomCount === 0) {
+                const index = rooms.indexOf(room);
+                if (index > -1) {
+                    rooms.splice(index, 1);
+                }
+            }
+        }
+    }
 }
 
 
