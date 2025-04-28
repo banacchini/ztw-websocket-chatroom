@@ -114,3 +114,8 @@ select {
 #joinBtn:hover {
     background-color: #0056b3;
 }
+
+.message.typing {
+    font-style: italic;
+    color: #888;
+}

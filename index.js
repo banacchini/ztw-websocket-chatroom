@@ -112,6 +112,11 @@ io.on('connection', (socket) => {
         io.to(room).emit('message', { nickname, message, image, time });
         console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
     });
+
+    // Handle "typing" event
+    socket.on('typing', ({ nickname, room }) => {
+        socket.to(room).emit('typing', { nickname });
+    });
 });
 
 // Helper function: Get rooms with user counts

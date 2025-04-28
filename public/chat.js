@@ -24,6 +24,37 @@ socket.off('nicknameAccepted').on('nicknameAccepted', () => {
     document.getElementById('chatContainer').style.display = 'block';
 });
 
+// Emit "typing" event when the user types
+const messageInputField = document.getElementById('messageInput');
+messageInputField.addEventListener('input', () => {
+    socket.emit('typing', { nickname, room: currentRoom });
+});
+
+// Show "typing..." information
+// Show "typing..." as a message in the chat window
+socket.off('typing').on('typing', (data) => {
+    const chatWindow = document.getElementById('chatWindow');
+    const typingMessageId = `typing-${data.nickname}`;
+
+    // Check if a typing message for this user already exists
+    if (!document.getElementById(typingMessageId)) {
+        const div = document.createElement('div');
+        div.id = typingMessageId;
+        div.className = 'message typing';
+        div.innerHTML = `<em>${data.nickname} is typing...</em>`;
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // Remove the typing message after 2 seconds
+    setTimeout(() => {
+        const typingMessage = document.getElementById(typingMessageId);
+        if (typingMessage) {
+            typingMessage.remove();
+        }
+    }, 2000);
+});
+
 // Change room
 document.getElementById('changeRoomBtn').addEventListener('click', () => {
     const select = document.getElementById('roomSelect');
@@ -75,33 +106,13 @@ document.getElementById('messageForm').addEventListener('submit', (e) => {
     }
 });
 
-// "Typing..." event
-const messageInputField = document.getElementById('messageInput');
-messageInputField.addEventListener('input', () => {
-    socket.emit('typing', { nickname, room: currentRoom });
-});
-
 // Display messages
-socket.on('message', (data) => {
+socket.off('message').on('message', (data) => {
     addMessage(data);
 });
 
-// Display images
-socket.on('image', (data) => {
-    addImage(data);
-});
-
-// Show "typing..." information
-socket.on('typing', (data) => {
-    const typingIndicator = document.getElementById('typingIndicator');
-    typingIndicator.innerText = `${data.nickname} is typing...`;
-    setTimeout(() => {
-        typingIndicator.innerText = "";
-    }, 2000);
-});
-
 // Update room list
-socket.on('roomList', (rooms) => {
+socket.off('roomList').on('roomList', (rooms) => {
     const select = document.getElementById('roomSelect');
     select.innerHTML = "";
 
@@ -123,17 +134,6 @@ function addMessage({ nickname: senderNickname, message, image, time }) {
     if (image) {
         div.innerHTML += `<br><img src="${image}" alt="Image" style="max-width: 200px;">`;
     }
-    chatWindow.appendChild(div);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-}
-
-// Helper: Add image to chat window
-function addImage({ nickname: senderNickname, image, time }) {
-    const chatWindow = document.getElementById('chatWindow');
-    const div = document.createElement('div');
-    const isOwnMessage = senderNickname === nickname; // Compare sender's nickname with the current user's nickname
-    div.className = isOwnMessage ? 'message own' : 'message';
-    div.innerHTML = `<strong>${senderNickname}</strong> [${time}]:<br><img src="${image}" alt="Image" style="max-width: 200px;">`;
     chatWindow.appendChild(div);
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }
