@@ -3,7 +3,7 @@ const socket = io();
 let nickname = "";
 let currentRoom = "general";
 
-// Ukrywamy czat, dopóki użytkownik nie poda nicku
+// Hide chat until the user provides a nickname
 document.getElementById('joinBtn').addEventListener('click', () => {
     const input = document.getElementById('nicknameInput');
     if (input.value.trim() !== "") {
@@ -14,7 +14,7 @@ document.getElementById('joinBtn').addEventListener('click', () => {
     }
 });
 
-// Zmieniamy pokój
+// Change room
 document.getElementById('changeRoomBtn').addEventListener('click', () => {
     const select = document.getElementById('roomSelect');
     const input = document.getElementById('roomInput');
@@ -25,29 +25,43 @@ document.getElementById('changeRoomBtn').addEventListener('click', () => {
         socket.emit('changeRoom', { nickname, newRoom, oldRoom: currentRoom });
         currentRoom = newRoom;
         clearMessages();
-        input.value = ""; // Czyścimy input po stworzeniu nowego pokoju
+        input.value = ""; // Clear input after creating a new room
     }
 });
 
-
-// Wysyłanie wiadomości i/lub obrazu
+// Send message and/or image
 document.getElementById('messageForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const messageInput = document.getElementById('messageInput');
-    const imageInput = document.getElementById('imageInput');
+    const fileInput = document.getElementById('fileInput');
 
-    if (messageInput.value.trim() !== "") {
-        socket.emit('chatMessage', { nickname, room: currentRoom, message: messageInput.value });
-        messageInput.value = "";
-    }
+    const message = messageInput.value.trim();
+    const file = fileInput.files[0];
 
-    if (imageInput.files.length > 0) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            socket.emit('chatImage', { nickname, room: currentRoom, image: e.target.result });
-        };
-        reader.readAsDataURL(imageInput.files[0]);
-        imageInput.value = ""; // Czyścimy input
+    if (message || file) {
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Emit both message and image
+                socket.emit('chatMessage', {
+                    nickname,
+                    room: currentRoom,
+                    message,
+                    image: reader.result // Send image as Base64
+                });
+
+                // Clear inputs
+                messageInput.value = "";
+                fileInput.value = "";
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // Emit only the message if no file is selected
+            socket.emit('chatMessage', { nickname, room: currentRoom, message });
+
+            // Clear input
+            messageInput.value = "";
+        }
     }
 });
 
@@ -57,17 +71,17 @@ messageInputField.addEventListener('input', () => {
     socket.emit('typing', { nickname, room: currentRoom });
 });
 
-// Wyświetlanie wiadomości
+// Display messages
 socket.on('message', (data) => {
     addMessage(data);
 });
 
-// Wyświetlanie zdjęcia
+// Display images
 socket.on('image', (data) => {
     addImage(data);
 });
 
-// Pokazywanie "typing..." informacji
+// Show "typing..." information
 socket.on('typing', (data) => {
     const typingIndicator = document.getElementById('typingIndicator');
     typingIndicator.innerText = `${data.nickname} is typing...`;
@@ -76,6 +90,7 @@ socket.on('typing', (data) => {
     }, 2000);
 });
 
+// Update room list
 socket.on('roomList', (rooms) => {
     const select = document.getElementById('roomSelect');
     select.innerHTML = "";
@@ -88,19 +103,21 @@ socket.on('roomList', (rooms) => {
     });
 });
 
-
-// Helper: dodaj wiadomość do okna czatu
-function addMessage(data) {
+// Helper: Add message to chat window
+function addMessage({ nickname, message, image, time }) {
     const chatWindow = document.getElementById('chatWindow');
     const div = document.createElement('div');
-    const isOwnMessage = data.nickname === nickname;
+    const isOwnMessage = nickname === nickname;
     div.className = isOwnMessage ? 'message own' : 'message';
-    div.innerHTML = `<strong>${data.nickname}</strong> [${data.time}]: ${data.message}`;
+    div.innerHTML = `<strong>${nickname}</strong> [${time}]: ${message || ""}`;
+    if (image) {
+        div.innerHTML += `<br><img src="${image}" alt="Image" style="max-width: 200px;">`;
+    }
     chatWindow.appendChild(div);
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-// Helper: dodaj zdjęcie do okna czatu
+// Helper: Add image to chat window
 function addImage(data) {
     const chatWindow = document.getElementById('chatWindow');
     const div = document.createElement('div');
@@ -111,7 +128,7 @@ function addImage(data) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-// Helper: czyścimy okno czatu (np. po zmianie pokoju)
+// Helper: Clear chat window (e.g., after changing rooms)
 function clearMessages() {
     document.getElementById('chatWindow').innerHTML = "";
 }

@@ -77,10 +77,30 @@ io.on('connection', (socket) => {
     });
 
     // Handle chatMessage event
-    socket.on('chatMessage', ({ nickname, room, message }) => {
+    socket.on('chatMessage', ({ nickname, room, message, image }) => {
         const time = moment().format('HH:mm');
-        io.to(room).emit('message', { nickname, message, time });
-        console.log(`[${room}] ${nickname}: ${message}`);
+        io.to(room).emit('message', { nickname, message, image, time });
+        console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
+    });
+
+    socket.on('sendImage', ({ room, image }) => {
+        io.to(room).emit('imageMessage', {
+            nickname: users[socket.id]?.nickname || 'Unknown',
+            image,
+            time: moment().format('HH:mm')
+        });
+        console.log(`[${room}] Image sent by ${users[socket.id]?.nickname || 'Unknown'}`);
+    });
+
+    socket.on('imageMessage', ({ nickname, image, time }) => {
+        const chatWindow = document.getElementById('chatWindow');
+        const messageElement = document.createElement('div');
+        messageElement.innerHTML = `
+        <p><strong>${nickname}</strong> <span>${time}</span></p>
+        <img src="${image}" alt="Sent image" style="max-width: 100%; height: auto;" />
+    `;
+        chatWindow.appendChild(messageElement);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
     });
 
     socket.on('disconnect', () => {

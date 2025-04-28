@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>WebSocket Chat</title>
-    <link rel="stylesheet" href="style.css"> <!-- Podłączymy CSS -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="loginContainer">
@@ -19,21 +19,18 @@
         <button id="changeRoomBtn">Dołącz</button>
     </div>
 
-
-
     <div id="chatWindow"></div>
 
     <p id="typingIndicator"></p>
 
     <form id="messageForm">
         <input type="text" id="messageInput" placeholder="Napisz wiadomość..." autocomplete="off">
-        <input type="file" id="imageInput">
+        <input type="file" id="fileInput" />
         <button type="submit">Wyślij</button>
     </form>
 </div>
 
-<!-- Socket.IO -->
 <script src="/socket.io/socket.io.js"></script>
-<script src="chat.js"></script> <!-- Nasza logika -->
+<script src="chat.js"></script>
 </body>
 </html>
