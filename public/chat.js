@@ -8,10 +8,20 @@ document.getElementById('joinBtn').addEventListener('click', () => {
     const input = document.getElementById('nicknameInput');
     if (input.value.trim() !== "") {
         nickname = input.value.trim();
-        document.getElementById('loginContainer').style.display = 'none';
-        document.getElementById('chatContainer').style.display = 'block';
         socket.emit('joinRoom', { nickname, room: currentRoom });
     }
+});
+
+// Remove existing listeners and add a single listener for nicknameError
+socket.off('nicknameError').on('nicknameError', (errorMessage) => {
+    alert(errorMessage); // Show an alert or display the error in the UI
+    document.getElementById('nicknameInput').value = ""; // Clear the input field
+});
+
+// Remove existing listeners and add a single listener for nicknameAccepted
+socket.off('nicknameAccepted').on('nicknameAccepted', () => {
+    document.getElementById('loginContainer').style.display = 'none';
+    document.getElementById('chatContainer').style.display = 'block';
 });
 
 // Change room
@@ -104,12 +114,12 @@ socket.on('roomList', (rooms) => {
 });
 
 // Helper: Add message to chat window
-function addMessage({ nickname, message, image, time }) {
+function addMessage({ nickname: senderNickname, message, image, time }) {
     const chatWindow = document.getElementById('chatWindow');
     const div = document.createElement('div');
-    const isOwnMessage = nickname === nickname;
+    const isOwnMessage = senderNickname === nickname; // Compare sender's nickname with the current user's nickname
     div.className = isOwnMessage ? 'message own' : 'message';
-    div.innerHTML = `<strong>${nickname}</strong> [${time}]: ${message || ""}`;
+    div.innerHTML = `<strong>${senderNickname}</strong> [${time}]: ${message || ""}`;
     if (image) {
         div.innerHTML += `<br><img src="${image}" alt="Image" style="max-width: 200px;">`;
     }
@@ -118,12 +128,12 @@ function addMessage({ nickname, message, image, time }) {
 }
 
 // Helper: Add image to chat window
-function addImage(data) {
+function addImage({ nickname: senderNickname, image, time }) {
     const chatWindow = document.getElementById('chatWindow');
     const div = document.createElement('div');
-    const isOwnMessage = data.nickname === nickname;
+    const isOwnMessage = senderNickname === nickname; // Compare sender's nickname with the current user's nickname
     div.className = isOwnMessage ? 'message own' : 'message';
-    div.innerHTML = `<strong>${data.nickname}</strong> [${data.time}]:<br><img src="${data.image}" alt="Image" style="max-width: 200px;">`;
+    div.innerHTML = `<strong>${senderNickname}</strong> [${time}]:<br><img src="${image}" alt="Image" style="max-width: 200px;">`;
     chatWindow.appendChild(div);
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }

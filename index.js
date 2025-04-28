@@ -1,145 +1,135 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const moment = require('moment'); // Użyjemy do formatowania daty
+const moment = require('moment');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const rooms = ['general']; // Startowy pokój
 
+const rooms = ['general']; // Default room
+const activeNicknames = new Set(); // Track active nicknames
+const users = {}; // Map socket.id -> user info
 
-// Serwujemy pliki z katalogu 'public'
+// Serve static files from the 'public' directory
 app.use(express.static('public'));
 
-// Mapowanie socket.id -> nick
-const users = {};
-
-
-
+// Handle socket.io connections
 io.on('connection', (socket) => {
-    console.log('Nowe połączenie:', socket.id);
+    console.log('New connection:', socket.id);
 
-    // Emit the correct room list structure
+    // Send the current room list to the client
     socket.emit('roomList', getRoomsWithCounts());
 
+    // Handle user joining a room
     socket.on('joinRoom', ({ nickname, room }) => {
+        if (activeNicknames.has(nickname)) {
+            socket.emit('nicknameError', 'This nickname is already in use. Please choose another one.');
+            return;
+        }
+
+        // Add nickname to active list and confirm login
+        activeNicknames.add(nickname);
+        socket.emit('nicknameAccepted');
         users[socket.id] = { nickname, room };
         socket.join(room);
 
-        // Add the room if it doesn't exist
         if (!rooms.includes(room)) {
             rooms.push(room);
         }
 
-        // Emit the updated room list
         io.emit('roomList', getRoomsWithCounts());
 
-        console.log(`${nickname} dołączył do pokoju: ${room}`);
+        console.log(`${nickname} joined room: ${room}`);
 
         socket.to(room).emit('message', {
             nickname: 'System',
-            message: `${nickname} dołączył do pokoju.`,
+            message: `${nickname} joined the room.`,
             time: moment().format('HH:mm')
         });
     });
 
+    // Handle user disconnecting
+    socket.on('disconnect', () => {
+        const user = users[socket.id];
+        if (user) {
+            const { nickname, room } = user;
+
+            // Remove nickname from active list
+            activeNicknames.delete(nickname);
+
+            // Notify the room about the user leaving
+            socket.to(room).emit('message', {
+                nickname: 'System',
+                message: `${nickname} left the chat.`,
+                time: moment().format('HH:mm')
+            });
+
+            // Remove user from the users map
+            delete users[socket.id];
+
+            // Clean up empty rooms
+            deleteEmptyRooms();
+
+            // Update the room list for all clients
+            io.emit('roomList', getRoomsWithCounts());
+        }
+    });
+
+    // Handle room changes
     socket.on('changeRoom', ({ nickname, newRoom, oldRoom }) => {
         socket.leave(oldRoom);
         socket.join(newRoom);
         users[socket.id].room = newRoom;
 
-        // Add the new room if it doesn't exist
         if (!rooms.includes(newRoom)) {
             rooms.push(newRoom);
         }
 
-        // Send messages before deleting empty rooms
+        // Notify the old and new rooms
         socket.to(oldRoom).emit('message', {
             nickname: 'System',
-            message: `${nickname} opuścił pokój.`,
+            message: `${nickname} left the room.`,
             time: moment().format('HH:mm')
         });
 
         socket.to(newRoom).emit('message', {
             nickname: 'System',
-            message: `${nickname} dołączył do pokoju.`,
+            message: `${nickname} joined the room.`,
             time: moment().format('HH:mm')
         });
 
-        console.log(`${nickname} zmienił pokój z ${oldRoom} na ${newRoom}`);
+        console.log(`${nickname} switched from ${oldRoom} to ${newRoom}`);
 
-        // Delete empty rooms after sending messages
+        // Clean up empty rooms and update the room list
         deleteEmptyRooms();
-
-        // Emit the updated room list
         io.emit('roomList', getRoomsWithCounts());
     });
 
-    // Handle chatMessage event
+    // Handle chat messages
     socket.on('chatMessage', ({ nickname, room, message, image }) => {
         const time = moment().format('HH:mm');
         io.to(room).emit('message', { nickname, message, image, time });
         console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
     });
-
-    socket.on('sendImage', ({ room, image }) => {
-        io.to(room).emit('imageMessage', {
-            nickname: users[socket.id]?.nickname || 'Unknown',
-            image,
-            time: moment().format('HH:mm')
-        });
-        console.log(`[${room}] Image sent by ${users[socket.id]?.nickname || 'Unknown'}`);
-    });
-
-    socket.on('imageMessage', ({ nickname, image, time }) => {
-        const chatWindow = document.getElementById('chatWindow');
-        const messageElement = document.createElement('div');
-        messageElement.innerHTML = `
-        <p><strong>${nickname}</strong> <span>${time}</span></p>
-        <img src="${image}" alt="Sent image" style="max-width: 100%; height: auto;" />
-    `;
-        chatWindow.appendChild(messageElement);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    });
-
-    socket.on('disconnect', () => {
-        if (users[socket.id]) {
-            const { nickname, room } = users[socket.id];
-            socket.to(room).emit('message', {
-                nickname: 'System',
-                message: `${nickname} opuścił czat.`,
-                time: moment().format('HH:mm')
-            });
-            console.log(`${nickname} (${socket.id}) rozłączył się`);
-            delete users[socket.id];
-        }
-
-        // Delete empty rooms and emit the updated room list
-        deleteEmptyRooms();
-        io.emit('roomList', getRoomsWithCounts());
-    });
 });
 
+// Helper function: Get rooms with user counts
 function getRoomsWithCounts() {
     const roomCounts = {};
 
     for (const id in users) {
         const room = users[id].room;
-        if (roomCounts[room]) {
-            roomCounts[room]++;
-        } else {
-            roomCounts[room] = 1;
-        }
+        roomCounts[room] = (roomCounts[room] || 0) + 1;
     }
 
-    // Zwracamy tablicę obiektów {name, count}
     return rooms.map(room => ({
         name: room,
         count: roomCounts[room] || 0
     }));
 }
 
+// Helper function: Delete empty rooms
 function deleteEmptyRooms() {
     for (const room of rooms) {
         if (room !== 'general') {
@@ -154,9 +144,8 @@ function deleteEmptyRooms() {
     }
 }
 
-
-// Nasłuch na porcie 3000
+// Start the server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Serwer działa na http://localhost:${PORT}`);
+    console.log(`Server running at http://localhost:${PORT}`);
 });
