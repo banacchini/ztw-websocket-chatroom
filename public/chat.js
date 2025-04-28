@@ -134,6 +134,25 @@ socket.off('message').on('message', (data) => {
     addMessage(data);
 });
 
+socket.off('reactionRemoved').on('reactionRemoved', ({ messageId, reaction }) => {
+    const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
+    if (messageDiv) {
+        const reactionsDiv = messageDiv.querySelector('.reactions');
+        const existingReaction = reactionsDiv.querySelector(`[data-reaction="${reaction}"]`);
+
+        if (existingReaction) {
+            const countSpan = existingReaction.querySelector('.reaction-count');
+            const newCount = parseInt(countSpan.innerText) - 1;
+
+            if (newCount > 0) {
+                countSpan.innerText = newCount;
+            } else {
+                existingReaction.remove();
+            }
+        }
+    }
+});
+
 // Update room list
 socket.off('roomList').on('roomList', (rooms) => {
     const select = document.getElementById('roomSelect');

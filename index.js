@@ -12,6 +12,8 @@ const activeNicknames = new Set(); // Track active nicknames
 const users = {}; // Map socket.id -> user info
 
 let messageIdCounter = 0;
+const messageReactions = new Map(); // Map to track reactions per message
+
 
 function generateUniqueId() {
     return `msg-${messageIdCounter++}`;
@@ -119,8 +121,25 @@ io.on('connection', (socket) => {
 
     // Handle "reaction" event
     socket.on('reaction', ({ messageId, reaction, room }) => {
+        if (!messageReactions.has(messageId)) {
+            messageReactions.set(messageId, new Map());
+        }
+
+        const userReactions = messageReactions.get(messageId);
+
+        // Remove the user's previous reaction if it exists
+        if (userReactions.has(socket.id)) {
+            const previousReaction = userReactions.get(socket.id);
+            io.to(room).emit('reactionRemoved', { messageId, reaction: previousReaction });
+        }
+
+        // Add the new reaction
+        userReactions.set(socket.id, reaction);
+
+        // Emit the updated reaction to the room
         io.to(room).emit('reaction', { messageId, reaction });
     });
+
 
 // Update the `chatMessage` event to include the generated ID
     socket.on('chatMessage', ({ nickname, room, message, image }) => {
