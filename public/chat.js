@@ -55,6 +55,29 @@ socket.off('typing').on('typing', (data) => {
     }, 2000);
 });
 
+// Handle incoming reactions
+socket.off('reaction').on('reaction', ({ messageId, reaction }) => {
+    console.log('Reaction received for messageId:', messageId); // Debugging log
+    const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
+    if (messageDiv) {
+        console.log('Found messageDiv with data-id:', messageDiv.dataset.id); // Debugging log
+        const reactionsDiv = messageDiv.querySelector('.reactions');
+        const existingReaction = reactionsDiv.querySelector(`[data-reaction="${reaction}"]`);
+
+        if (existingReaction) {
+            const countSpan = existingReaction.querySelector('.reaction-count');
+            countSpan.innerText = parseInt(countSpan.innerText) + 1;
+        } else {
+            const span = document.createElement('span');
+            span.dataset.reaction = reaction;
+            span.innerHTML = `${reaction} <span class="reaction-count">1</span>`;
+            reactionsDiv.appendChild(span);
+        }
+    } else {
+        console.error('No messageDiv found for messageId:', messageId); // Debugging log
+    }
+});
+
 // Change room
 document.getElementById('changeRoomBtn').addEventListener('click', () => {
     const select = document.getElementById('roomSelect');
@@ -124,18 +147,57 @@ socket.off('roomList').on('roomList', (rooms) => {
     });
 });
 
-// Helper: Add message to chat window
-function addMessage({ nickname: senderNickname, message, image, time }) {
+// Add message with reaction support
+function addMessage({ id, nickname: senderNickname, message, image, time }) {
+    console.log('Adding message with id:', id); // Debugging log
     const chatWindow = document.getElementById('chatWindow');
     const div = document.createElement('div');
-    const isOwnMessage = senderNickname === nickname; // Compare sender's nickname with the current user's nickname
+    const isOwnMessage = senderNickname === nickname;
     div.className = isOwnMessage ? 'message own' : 'message';
-    div.innerHTML = `<strong>${senderNickname}</strong> [${time}]: ${message || ""}`;
-    if (image) {
-        div.innerHTML += `<br><img src="${image}" alt="Image" style="max-width: 200px;">`;
-    }
+    div.dataset.id = id; // Ensure `id` is unique for each message
+    div.innerHTML = `
+        <strong>${senderNickname}</strong> [${time}]: ${message || ""}
+        ${image ? `<br><img src="${image}" alt="Image" style="max-width: 200px;">` : ""}
+        <div class="reactions"></div>
+        <button class="react-button">React</button>
+    `;
+
+    const reactButton = div.querySelector('.react-button');
+    reactButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showReactionOptions(e, id);
+    });
+
     chatWindow.appendChild(div);
     chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function showReactionOptions(event, messageId) {
+    console.log('Opening reaction menu for messageId:', messageId); // Debugging log
+    const existingMenu = document.querySelector('.reaction-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+
+    const reactionOptions = ['👍', '❤️', '😂', '😮', '😢', '👎'];
+    const reactionMenu = document.createElement('div');
+    reactionMenu.className = 'reaction-menu';
+    reactionOptions.forEach(reaction => {
+        const button = document.createElement('button');
+        button.innerText = reaction;
+        button.addEventListener('click', () => {
+            console.log('Reacting with:', reaction, 'to messageId:', messageId); // Debugging log
+            socket.emit('reaction', { messageId, reaction, room: currentRoom });
+            reactionMenu.remove();
+        });
+        reactionMenu.appendChild(button);
+    });
+
+    const buttonRect = event.currentTarget.getBoundingClientRect();
+    reactionMenu.style.position = 'absolute';
+    reactionMenu.style.top = `${buttonRect.bottom + window.scrollY}px`;
+    reactionMenu.style.left = `${buttonRect.left + window.scrollX}px`;
+    document.body.appendChild(reactionMenu);
 }
 
 // Helper: Clear chat window (e.g., after changing rooms)

@@ -11,6 +11,12 @@ const rooms = ['general']; // Default room
 const activeNicknames = new Set(); // Track active nicknames
 const users = {}; // Map socket.id -> user info
 
+let messageIdCounter = 0;
+
+function generateUniqueId() {
+    return `msg-${messageIdCounter++}`;
+}
+
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
@@ -106,16 +112,22 @@ io.on('connection', (socket) => {
         io.emit('roomList', getRoomsWithCounts());
     });
 
-    // Handle chat messages
-    socket.on('chatMessage', ({ nickname, room, message, image }) => {
-        const time = moment().format('HH:mm');
-        io.to(room).emit('message', { nickname, message, image, time });
-        console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
-    });
-
     // Handle "typing" event
     socket.on('typing', ({ nickname, room }) => {
         socket.to(room).emit('typing', { nickname });
+    });
+
+    // Handle "reaction" event
+    socket.on('reaction', ({ messageId, reaction, room }) => {
+        io.to(room).emit('reaction', { messageId, reaction });
+    });
+
+// Update the `chatMessage` event to include the generated ID
+    socket.on('chatMessage', ({ nickname, room, message, image }) => {
+        const time = moment().format('HH:mm');
+        const id = generateUniqueId(); // Generate a unique ID for the message
+        io.to(room).emit('message', { id, nickname, message, image, time });
+        console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
     });
 });
 
@@ -148,6 +160,8 @@ function deleteEmptyRooms() {
         }
     }
 }
+
+
 
 // Start the server
 const PORT = process.env.PORT || 3000;
