@@ -2,8 +2,12 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebSocket Chat</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 <div id="loginContainer">
@@ -25,8 +29,19 @@
 
     <form id="messageForm">
         <input type="text" id="messageInput" placeholder="Napisz wiadomość..." autocomplete="off">
-        <input type="file" id="fileInput" />
-        <button type="submit">Wyślij</button>
+        <div class="file-input-wrapper">
+            <input type="file" id="fileInput" accept="image/*" />
+            <label for="fileInput" class="file-input-label">
+                <svg viewBox="0 0 24 24">
+                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+                </svg>
+            </label>
+        </div>
+        <button type="submit">
+            <svg viewBox="0 0 24 24">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+        </button>
     </form>
 </div>
 
