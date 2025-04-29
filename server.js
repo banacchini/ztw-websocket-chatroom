@@ -17,11 +17,6 @@ let messageIdCounter = 0;
 const messageReactions = new Map(); // Map to track reactions per message
 const messageHistory = new Map();
 
-
-function generateUniqueId() {
-    return `msg-${messageIdCounter++}`;
-}
-
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
@@ -161,7 +156,7 @@ io.on('connection', (socket) => {
         const time = moment().format('HH:mm');
         const id = generateUniqueId(); // Generate a unique ID for the message
         const messageData = { id, nickname, message, image, time };
-        
+
         io.to(room).emit('message', messageData);
         saveMessageToHistory(room, messageData);
         console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
@@ -189,6 +184,9 @@ function deleteEmptyRooms() {
         if (room !== 'general') {
             const roomCount = io.sockets.adapter.rooms.get(room)?.size || 0;
             if (roomCount === 0) {
+                //Remove the room message history
+                messageHistory.delete(room);
+
                 const index = rooms.indexOf(room);
                 if (index > -1) {
                     rooms.splice(index, 1);
@@ -202,27 +200,51 @@ function saveMessageToHistory(room, messageData) {
     if (!messageHistory.has(room)) {
         messageHistory.set(room, []);
     }
-    
+
     const roomHistory = messageHistory.get(room);
-    roomHistory.push(messageData);
-    
-    // Ograniczenie historii do ostatnich 50 wiadomości
+    roomHistory.push({ ...messageData, reactions: {} }); // Ensure reactions are initialized
+
+    // Limit history to the last 50 messages
     if (roomHistory.length > 50) {
         roomHistory.shift();
     }
 }
 
+
+//Helper function: Generate a unique ID for each message
+function generateUniqueId() {
+    return `msg-${messageIdCounter++}`;
+}
+
+
 function updateMessageReaction(messageId, room, reaction, socketId) {
     if (messageHistory.has(room)) {
         const history = messageHistory.get(room);
         const messageIndex = history.findIndex(msg => msg.id === messageId);
-        
+
         if (messageIndex !== -1) {
-            // Dodawanie reakcji do wiadomości w historii
-            if (!history[messageIndex].reactions) {
-                history[messageIndex].reactions = {};
+            const message = history[messageIndex];
+
+            // Initialize reactions if not present
+            if (!message.reactions) {
+                message.reactions = {};
             }
-            history[messageIndex].reactions[socketId] = reaction;
+
+            // Remove the user's previous reaction if it exists
+            for (const [type, users] of Object.entries(message.reactions)) {
+                if (users.includes(socketId)) {
+                    message.reactions[type] = users.filter(id => id !== socketId);
+                    if (message.reactions[type].length === 0) {
+                        delete message.reactions[type];
+                    }
+                }
+            }
+
+            // Add the new reaction
+            if (!message.reactions[reaction]) {
+                message.reactions[reaction] = [];
+            }
+            message.reactions[reaction].push(socketId);
         }
     }
 }

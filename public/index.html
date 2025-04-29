@@ -12,7 +12,7 @@
 <body>
 <div id="loginContainer">
     <h2>Podaj swój nick:</h2>
-    <input type="text" id="nicknameInput" placeholder="Twój nick">
+    <input id="nicknameInput" type="text" placeholder="Enter your nickname" />
     <button id="joinBtn">Dołącz</button>
 </div>
 
@@ -43,6 +43,8 @@
             </svg>
         </button>
     </form>
+
+    <div id="messagesList"></div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
