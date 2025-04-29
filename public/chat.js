@@ -112,6 +112,60 @@ socket.off('reaction').on('reaction', ({ messageId, reaction }) => {
     }
 });
 
+socket.off('reactionRemoved').on('reactionRemoved', ({ messageId, reaction }) => {
+    const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
+    if (messageDiv) {
+        const reactionsDiv = messageDiv.querySelector('.reactions');
+        const existingReaction = reactionsDiv.querySelector(`[data-reaction="${reaction}"]`);
+
+        if (existingReaction) {
+            const countSpan = existingReaction.querySelector('.reaction-count');
+            const newCount = parseInt(countSpan.innerText) - 1;
+
+            if (newCount > 0) {
+                countSpan.innerText = newCount;
+            } else {
+                existingReaction.remove();
+            }
+        }
+    }
+});
+
+function showReactionOptions(event, messageId) {
+    console.log('Opening reaction menu for messageId:', messageId); // Debugging log
+    const existingMenu = document.querySelector('.reaction-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+
+    const reactionOptions = ['👍', '❤️', '😂', '😮', '😢', '👎'];
+    const reactionMenu = document.createElement('div');
+    reactionMenu.className = 'reaction-menu';
+    reactionOptions.forEach(reaction => {
+        const button = document.createElement('button');
+        button.innerText = reaction;
+        button.addEventListener('click', () => {
+            console.log('Reacting with:', reaction, 'to messageId:', messageId); // Debugging log
+            socket.emit('reaction', { messageId, reaction, room: currentRoom });
+            reactionMenu.remove();
+        });
+        reactionMenu.appendChild(button);
+    });
+
+    const buttonRect = event.currentTarget.getBoundingClientRect();
+    reactionMenu.style.position = 'absolute';
+    reactionMenu.style.top = `${buttonRect.bottom + window.scrollY}px`;
+    reactionMenu.style.left = `${buttonRect.left + window.scrollX}px`;
+    document.body.appendChild(reactionMenu);
+
+    document.addEventListener('click', function closeMenu(e) {
+        if (!reactionMenu.contains(e.target) && e.target !== event.currentTarget) {
+            reactionMenu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    });
+}
+
 // Change room
 document.getElementById('changeRoomBtn').addEventListener('click', () => {
     const select = document.getElementById('roomSelect');
@@ -129,9 +183,23 @@ document.getElementById('changeRoomBtn').addEventListener('click', () => {
     }
 });
 
+// Update room list
+socket.off('roomList').on('roomList', (rooms) => {
+    const select = document.getElementById('roomSelect');
+    select.innerHTML = "";
+
+    rooms.forEach(room => {
+        const option = document.createElement('option');
+        option.value = room.name;
+        option.selected = room.name === currentRoom;
+        option.innerText = `# ${room.name} (${room.count})`;
+        select.appendChild(option);
+    });
+});
+
 document.getElementById('fileInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
-    if (file) {
+    if (file && file.type.startsWith('image/')) {
         // Create or show the image preview container
         let previewContainer = document.getElementById('imagePreviewContainer');
         if (!previewContainer) {
@@ -169,6 +237,9 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
             previewContainer.appendChild(removeBtn);
         };
         reader.readAsDataURL(file);
+    } else {
+        alert("Niepoprawny format pliku")
+        e.target.value = ''
     }
 });
 
@@ -227,39 +298,6 @@ socket.off('message').on('message', (data) => {
     }
 });
 
-socket.off('reactionRemoved').on('reactionRemoved', ({ messageId, reaction }) => {
-    const messageDiv = document.querySelector(`[data-id="${messageId}"]`);
-    if (messageDiv) {
-        const reactionsDiv = messageDiv.querySelector('.reactions');
-        const existingReaction = reactionsDiv.querySelector(`[data-reaction="${reaction}"]`);
-
-        if (existingReaction) {
-            const countSpan = existingReaction.querySelector('.reaction-count');
-            const newCount = parseInt(countSpan.innerText) - 1;
-
-            if (newCount > 0) {
-                countSpan.innerText = newCount;
-            } else {
-                existingReaction.remove();
-            }
-        }
-    }
-});
-
-// Update room list
-socket.off('roomList').on('roomList', (rooms) => {
-    const select = document.getElementById('roomSelect');
-    select.innerHTML = "";
-
-    rooms.forEach(room => {
-        const option = document.createElement('option');
-        option.value = room.name;
-        option.selected = room.name === currentRoom;
-        option.innerText = `# ${room.name} (${room.count})`;
-        select.appendChild(option);
-    });
-});
-
 function addSystemMessage(message) {
     const chatWindow = document.getElementById('chatWindow');
     const div = document.createElement('div');
@@ -306,41 +344,6 @@ function addMessage({ id, nickname: senderNickname, message, image, time }) {
 
     chatWindow.appendChild(div);
     chatWindow.scrollTop = chatWindow.scrollHeight;
-}
-
-function showReactionOptions(event, messageId) {
-    console.log('Opening reaction menu for messageId:', messageId); // Debugging log
-    const existingMenu = document.querySelector('.reaction-menu');
-    if (existingMenu) {
-        existingMenu.remove();
-    }
-
-    const reactionOptions = ['👍', '❤️', '😂', '😮', '😢', '👎'];
-    const reactionMenu = document.createElement('div');
-    reactionMenu.className = 'reaction-menu';
-    reactionOptions.forEach(reaction => {
-        const button = document.createElement('button');
-        button.innerText = reaction;
-        button.addEventListener('click', () => {
-            console.log('Reacting with:', reaction, 'to messageId:', messageId); // Debugging log
-            socket.emit('reaction', { messageId, reaction, room: currentRoom });
-            reactionMenu.remove();
-        });
-        reactionMenu.appendChild(button);
-    });
-
-    const buttonRect = event.currentTarget.getBoundingClientRect();
-    reactionMenu.style.position = 'absolute';
-    reactionMenu.style.top = `${buttonRect.bottom + window.scrollY}px`;
-    reactionMenu.style.left = `${buttonRect.left + window.scrollX}px`;
-    document.body.appendChild(reactionMenu);
-
-    document.addEventListener('click', function closeMenu(e) {
-        if (!reactionMenu.contains(e.target) && e.target !== event.currentTarget) {
-            reactionMenu.remove();
-            document.removeEventListener('click', closeMenu);
-        }
-    });
 }
 
 // Helper: Clear chat window (e.g., after changing rooms)

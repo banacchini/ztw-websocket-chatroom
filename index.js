@@ -15,6 +15,7 @@ const users = {}; // Map socket.id -> user info
 
 let messageIdCounter = 0;
 const messageReactions = new Map(); // Map to track reactions per message
+const messageHistory = new Map();
 
 
 function generateUniqueId() {
@@ -57,6 +58,11 @@ io.on('connection', (socket) => {
             message: `${nickname} joined the room.`,
             time: moment().format('HH:mm')
         });
+
+        if (messageHistory.has(room)) {
+            const roomHistory = messageHistory.get(room);
+            socket.emit('messageHistory', roomHistory);
+        }
     });
 
     // Handle user disconnecting
@@ -111,6 +117,11 @@ io.on('connection', (socket) => {
 
         console.log(`${nickname} switched from ${oldRoom} to ${newRoom}`);
 
+        if (messageHistory.has(newRoom)) {
+            const roomHistory = messageHistory.get(newRoom);
+            socket.emit('messageHistory', roomHistory);
+        }
+
         // Clean up empty rooms and update the room list
         deleteEmptyRooms();
         io.emit('roomList', getRoomsWithCounts());
@@ -140,6 +151,8 @@ io.on('connection', (socket) => {
 
         // Emit the updated reaction to the room
         io.to(room).emit('reaction', { messageId, reaction });
+
+        updateMessageReaction(messageId, room, reaction, socket.id);
     });
 
 
@@ -147,7 +160,10 @@ io.on('connection', (socket) => {
     socket.on('chatMessage', ({ nickname, room, message, image }) => {
         const time = moment().format('HH:mm');
         const id = generateUniqueId(); // Generate a unique ID for the message
-        io.to(room).emit('message', { id, nickname, message, image, time });
+        const messageData = { id, nickname, message, image, time };
+        
+        io.to(room).emit('message', messageData);
+        saveMessageToHistory(room, messageData);
         console.log(`[${room}] ${nickname}: ${message || "Image sent"}`);
     });
 });
@@ -182,7 +198,34 @@ function deleteEmptyRooms() {
     }
 }
 
+function saveMessageToHistory(room, messageData) {
+    if (!messageHistory.has(room)) {
+        messageHistory.set(room, []);
+    }
+    
+    const roomHistory = messageHistory.get(room);
+    roomHistory.push(messageData);
+    
+    // Ograniczenie historii do ostatnich 50 wiadomości
+    if (roomHistory.length > 50) {
+        roomHistory.shift();
+    }
+}
 
+function updateMessageReaction(messageId, room, reaction, socketId) {
+    if (messageHistory.has(room)) {
+        const history = messageHistory.get(room);
+        const messageIndex = history.findIndex(msg => msg.id === messageId);
+        
+        if (messageIndex !== -1) {
+            // Dodawanie reakcji do wiadomości w historii
+            if (!history[messageIndex].reactions) {
+                history[messageIndex].reactions = {};
+            }
+            history[messageIndex].reactions[socketId] = reaction;
+        }
+    }
+}
 
 // Start the server
 const PORT = process.env.PORT || 3000;
