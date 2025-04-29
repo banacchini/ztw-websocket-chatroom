@@ -5,7 +5,9 @@ const moment = require('moment');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    maxHttpBufferSize: 2e6 // 2 MB
+});
 
 const rooms = ['general']; // Default room
 const activeNicknames = new Set(); // Track active nicknames

@@ -1,4 +1,5 @@
 const socket = io();
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 
 let nickname = "";
 let currentRoom = "general";
@@ -182,6 +183,11 @@ document.getElementById('messageForm').addEventListener('submit', (e) => {
 
     if (message || file) {
         if (file) {
+            if (file.size > MAX_IMAGE_SIZE) {
+                alert('Plik jest za duży (maksymalnie 2 MB).');
+                e.target.value = '';
+                return;
+            }
             const reader = new FileReader();
             reader.onload = () => {
                 // Emit both message and image
@@ -365,6 +371,12 @@ chatWindow.addEventListener('drop', (e) => {
     
     const files = e.dataTransfer.files;
     if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const file = files[0];
+        if (file.size > MAX_IMAGE_SIZE) {
+            alert('Plik jest za duży (maksymalnie 2 MB).');
+            return;
+        }
+
         const fileInput = document.getElementById('fileInput');
         fileInput.files = files;
 
