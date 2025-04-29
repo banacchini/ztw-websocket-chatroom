@@ -13,6 +13,7 @@ const rooms = ['general']; // Default room
 const activeNicknames = new Set(); // Track active nicknames
 const users = {}; // Map socket.id -> user info
 
+
 let messageIdCounter = 0;
 const messageReactions = new Map(); // Map to track reactions per message
 const messageHistory = new Map();
@@ -29,6 +30,11 @@ io.on('connection', (socket) => {
 
     // Handle user joining a room
     socket.on('joinRoom', ({ nickname, room }) => {
+        if (nickname.length > 16) {
+            socket.emit('nicknameError', 'Nickname cannot exceed 16 characters.');
+            return;
+        }
+
         if (activeNicknames.has(nickname)) {
             socket.emit('nicknameError', 'This nickname is already in use. Please choose another one.');
             return;

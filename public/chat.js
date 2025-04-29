@@ -5,6 +5,9 @@ const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 let nickname = "";
 let currentRoom = "general";
 
+const chatWindow = document.getElementById('chatWindow');
+
+
 // Event Listeners for DOM Elements
 document.getElementById('nicknameInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
@@ -14,10 +17,21 @@ document.getElementById('nicknameInput').addEventListener('keypress', (e) => {
 
 document.getElementById('joinBtn').addEventListener('click', () => {
     const input = document.getElementById('nicknameInput');
-    if (input.value.trim() !== "") {
-        nickname = input.value.trim();
-        socket.emit('joinRoom', { nickname, room: currentRoom });
+    const nicknameValue = input.value.trim();
+
+    if (nicknameValue === "") {
+        alert("Nickname cannot be empty.");
+        return;
     }
+
+    if (nicknameValue.length > 16) {
+        alert("Nickname cannot exceed 16 characters.");
+        input.value = ""; // Clear the input field
+        return;
+    }
+
+    nickname = nicknameValue;
+    socket.emit('joinRoom', { nickname, room: currentRoom });
 });
 
 document.getElementById('messageForm').addEventListener('submit', (e) => {
@@ -117,10 +131,38 @@ document.getElementById('changeRoomBtn').addEventListener('click', () => {
     }
 });
 
+// Add event listener for the disconnect button
+document.getElementById('disconnectBtn').addEventListener('click', () => {
+    location.reload(); // Reload the page
+});
+
 document.addEventListener('click', (e) => {
     const reactionMenu = document.querySelector('.reaction-menu');
     if (reactionMenu && !reactionMenu.contains(e.target) && !e.target.classList.contains('react-button')) {
         reactionMenu.remove();
+    }
+});
+
+chatWindow.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    chatWindow.classList.add('drag-over'); // Add a visual indicator
+});
+
+chatWindow.addEventListener('dragleave', () => {
+    chatWindow.classList.remove('drag-over'); // Remove the visual indicator
+});
+
+chatWindow.addEventListener('drop', (e) => {
+    e.preventDefault();
+    chatWindow.classList.remove('drag-over'); // Remove the visual indicator
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const fileInput = document.getElementById('fileInput');
+        fileInput.files = files;
+
+        // Trigger the file input's change event
+        fileInput.dispatchEvent(new Event('change'));
     }
 });
 
